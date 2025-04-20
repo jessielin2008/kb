@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cockroach Labs Chatbot</title>
+    <title>Cockroach Labs Knowledge Base Chatbot</title>
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -18,8 +18,8 @@
         }
 
         #chat-container {
-            width: 400px;
-            height: 500px;
+            width: 700px;
+            height: 600px;
             background: #1e293b;
             border-radius: 10px;
             overflow-y: auto;
@@ -36,7 +36,7 @@
             margin: 10px 0;
             padding: 10px;
             border-radius: 5px;
-            max-width: 75%;
+            max-width: 90%;
         }
 
         .user-message {
@@ -50,11 +50,12 @@
         }
 
         #cockroach-animation {
-            width: 100px;
-            height: 100px;
-            background: url('https://lookaside.fbsbx.com/lookaside/crawler/media/?media_id=100063612638030') no-repeat center;
-            background-size: contain;
+            width: 40px;
+            height: 40px;
+            background-color: #94a3b8;
+            border-radius: 50%;
             animation: none;
+            margin: 10px auto;
         }
 
         @keyframes listening {
@@ -83,30 +84,10 @@
     <div id="chat-container">
         <div id="messages"></div>
         <div id="cockroach-animation"></div>
-        <button onclick="startVoiceInput()">🎤 Speak</button>
         <input type="text" id="user-input" placeholder="Type your message..." onkeypress="handleKeyPress(event)">
     </div>
-    
-    <script>
-        function startVoiceInput() {
-            let recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-            recognition.lang = 'en-US';
-            
-            let cockroach = document.getElementById('cockroach-animation');
-            cockroach.style.animation = 'listening 1s infinite';
-            
-            recognition.start();
-            recognition.onresult = function(event) {
-                let text = event.results[0][0].transcript;
-                document.getElementById("user-input").value = text;
-                sendMessage();
-            };
-            
-            recognition.onend = function() {
-                cockroach.style.animation = 'none';
-            };
-        }
 
+    <script>
         function handleKeyPress(event) {
             if (event.key === 'Enter') {
                 sendMessage();
@@ -122,20 +103,35 @@
             userMessage.classList.add("message", "user-message");
             userMessage.innerText = userInput;
             messagesDiv.appendChild(userMessage);
-            
+
             document.getElementById("user-input").value = "";
             let cockroach = document.getElementById('cockroach-animation');
             cockroach.style.animation = 'moving 1s infinite';
 
             fetch(`http://localhost:8000/rag?question=${encodeURIComponent(userInput)}`, {
                 method: "GET",
-                headers: { "Content-Type": "application/json" }
+                headers: {
+                    "X-API-Key": "test_f47ac10b-58cc-4372-a567-0e02b2c3d479"
+                }
             })
             .then(response => response.json())
             .then(data => {
                 let botMessage = document.createElement("div");
                 botMessage.classList.add("message", "bot-message");
-                botMessage.innerText = data.answer;
+
+                // Display answer text
+                botMessage.innerHTML = `<p>${data.answer}</p>`;
+
+                // Add numbered text sources with similarity percentages and hyperlinks
+                if (data.urls && data.urls.length > 0 && data.similarities && data.similarities.length > 0) {
+                    botMessage.innerHTML += `<p>🔗 Sources:</p><ul>`;
+                    data.urls.forEach((url, index) => {
+                        const similarity = (parseFloat(data.similarities[index]) * 100).toFixed(2);
+                        botMessage.innerHTML += `<li>Similarity Score: ${similarity}% - <a href="${url}" target="_blank">Source ${index + 1}</a></li>`;
+                    });
+                    botMessage.innerHTML += `</ul>`;
+                }
+
                 messagesDiv.appendChild(botMessage);
                 cockroach.style.animation = 'none';
             })

@@ -1,0 +1,5 @@
+numpy==2.2.4
+psycopg==3.2.6
+sentence_transformers==4.0.2
+tqdm==4.67.1
+openai=1.63.2

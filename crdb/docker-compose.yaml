@@ -1,0 +1,13 @@
+version: '0.1'
+
+services:
+
+ crdb:
+   image: cockroachdb/cockroach:v25.2.0
+   ports:
+     - "26257:26257"
+     - "8080:8080"
+   volumes:
+     - "${PWD}/cockroach-data:/cockroach/cockroach-data"
+   command: start-single-node --insecure
+

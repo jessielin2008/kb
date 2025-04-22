@@ -111,7 +111,7 @@
             fetch(`http://localhost:8000/rag?question=${encodeURIComponent(userInput)}`, {
                 method: "GET",
                 headers: {
-                    "X-API-Key": "test_f47ac10b-58cc-4372-a567-0e02b2c3d479"
+                    "X-API-Key": "<rag_api_key>"
                 }
             })
             .then(response => response.json())

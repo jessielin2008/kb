@@ -1,4 +1,10 @@
-# Runbook: Fix Changefeeds error: `Message was too large`
+---
+title: Runbook: Fix Changefeeds error: `Message was too large`
+summary: A Technical Support Engineers Runbook to diagnose and solve Changefeeds error: `Message was too large`
+toc: true
+docs_area: default privileges
+---
+
 ## Confirmation Steps:
 
 Following log line appears: kafka server: Message was too large, server rejected it to avoid allocation error  

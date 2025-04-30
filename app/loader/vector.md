@@ -69,7 +69,7 @@ Insert some sample data into the table:
 INSERT INTO items (category, vector) VALUES
 	('electronics', '[1.0, 0.0, 0.0]'),
 	('electronics', '[0.9, 0.1, 0.0]'),
-	('furniture', '[0.0, 1.0, 0.0]'),
+	('furniture', '[0.0, 1.0, 0.0]'), 
 	('furniture', '[0.0, 0.9, 0.1]'),
 	('clothing', '[0.0, 0.0, 1.0]');
 ~~~

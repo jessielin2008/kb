@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cockroach Labs Knowledge Base Chatbot</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -37,6 +38,7 @@
             padding: 10px;
             border-radius: 5px;
             max-width: 90%;
+            white-space: pre-wrap;
         }
 
         .user-message {
@@ -77,6 +79,16 @@
             border: none;
             margin-top: 10px;
         }
+
+        #voice-button {
+            margin-top: 10px;
+            background-color: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            padding: 10px;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -85,6 +97,7 @@
         <div id="messages"></div>
         <div id="cockroach-animation"></div>
         <input type="text" id="user-input" placeholder="Type your message..." onkeypress="handleKeyPress(event)">
+        <button id="voice-button" onclick="startVoiceInput()">🎤 Speak</button>
     </div>
 
     <script>
@@ -92,6 +105,30 @@
             if (event.key === 'Enter') {
                 sendMessage();
             }
+        }
+
+        function startVoiceInput() {
+            const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+            recognition.lang = 'en-US';
+
+            const cockroach = document.getElementById('cockroach-animation');
+            cockroach.style.animation = 'listening 1s infinite';
+
+            recognition.start();
+
+            recognition.onresult = function(event) {
+                const transcript = event.results[0][0].transcript;
+                document.getElementById("user-input").value = transcript;
+                sendMessage();
+            };
+
+            recognition.onend = function() {
+                cockroach.style.animation = 'none';
+            };
+
+            recognition.onerror = function() {
+                cockroach.style.animation = 'none';
+            };
         }
 
         function sendMessage() {
@@ -111,7 +148,7 @@
             fetch(`http://localhost:8000/rag?question=${encodeURIComponent(userInput)}`, {
                 method: "GET",
                 headers: {
-                    "X-API-Key": "<rag_api_key>"
+                    "Authorization": "Bearer test_<api-key>"
                 }
             })
             .then(response => response.json())
@@ -119,15 +156,14 @@
                 let botMessage = document.createElement("div");
                 botMessage.classList.add("message", "bot-message");
 
-                // Display answer text
-                botMessage.innerHTML = `<p>${data.answer}</p>`;
+                const formattedAnswer = marked.parse(data.answer);
 
-                // Add numbered text sources with similarity percentages and hyperlinks
-                if (data.urls && data.urls.length > 0 && data.similarities && data.similarities.length > 0) {
+                botMessage.innerHTML = `<div>${formattedAnswer}</div>`;
+
+                if (data.urls && data.urls.length > 0) {
                     botMessage.innerHTML += `<p>🔗 Sources:</p><ul>`;
                     data.urls.forEach((url, index) => {
-                        const similarity = (parseFloat(data.similarities[index]) * 100).toFixed(2);
-                        botMessage.innerHTML += `<li>Similarity Score: ${similarity}% - <a href="${url}" target="_blank">Source ${index + 1}</a></li>`;
+                        botMessage.innerHTML += `<li><a href="${url}" target="_blank">Source ${index + 1}</a></li>`;
                     });
                     botMessage.innerHTML += `</ul>`;
                 }

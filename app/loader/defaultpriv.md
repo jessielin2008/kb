@@ -1,5 +1,9 @@
-# Implementing RBAC on 23.2 using Default Privileges
-
+---
+title: Implementing RBAC on 23.2 using Default Privileges
+summary: A step-by-step User Guide on implementing Default Privileges on CockroachDB with different user roles and privileges.
+toc: true
+docs_area: default privileges
+---
 [**Introduction**](#introduction)	**[0](#introduction)**
 
 [**Implementation Overview**](#implementation-overview)	**[0](#implementation-overview)**
@@ -10,7 +14,6 @@
 
 [Additional considerations](#additional-considerations)	[6](#additional-considerations)
 
-# 
 
 # Revision Notes
 

@@ -17,7 +17,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the rest of the application code into the container
 COPY . .
-COPY root.crt /root/.postgresql/root.crt
 
 # Expose port 8000
 EXPOSE 8000

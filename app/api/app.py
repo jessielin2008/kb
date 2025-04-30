@@ -2,6 +2,7 @@
 # coding: utf-8
 from fastapi import FastAPI
 from fastapi import Header, HTTPException, Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import os
 from openai import OpenAI
 from glob import glob
@@ -16,8 +17,8 @@ logging.basicConfig(
     level=logging.DEBUG,  # You can change to INFO in production
     format="%(asctime)s - %(levelname)s - %(message)s"
 )
-
 logger = logging.getLogger(__name__)
+bearer_scheme = HTTPBearer()
 
 # model = SentenceTransformer("all-MiniLM-L6-v2")
 
@@ -80,10 +81,10 @@ def retrieve_similar_texts(query, crdb_ver, k=3):
     # print (embedding_str)
     with conn.cursor() as cursor:
         cursor.execute(f"""
-            SELECT url, text, embedding <=> %s AS similarity
+            SELECT url, text, embedding <-> %s AS distance
             FROM embeddings
             WHERE version = %s
-            ORDER BY embedding <=> %s DESC
+            ORDER BY embedding <-> %s
             LIMIT %s;
         """, (embedding_str, crdb_ver, embedding_str, k))
     
@@ -127,7 +128,7 @@ def generate_rag_response(question, k=3):
         ],
     )
     answer = response.choices[0].message.content
-    return {"answer": answer, "urls": urls, "similarities": similarities}
+    return {"answer": answer, "urls": urls}
 
 def validate_api_key(api_key: str) -> bool:
     try:
@@ -148,8 +149,8 @@ def validate_api_key(api_key: str) -> bool:
         print(f"[ERROR] API key validation failed: {e}")
         return False
  
-def verify_api_key(x_api_key: str = Header(...)):
-    if not validate_api_key(x_api_key):
+def verify_api_key(credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme)):
+    if not validate_api_key(credentials.credentials):
         raise HTTPException(status_code=403, detail="Invalid API Key")
    
 @app.get("/rag")

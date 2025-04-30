@@ -24,7 +24,7 @@ def create_schema (conn):
                      text STRING NULL,
                      embedding VECTOR(1536) NULL ,
                      CONSTRAINT embeddings_pkey PRIMARY KEY (id ASC),
-                     VECTOR INDEX (embedding)
+                     VECTOR INDEX (version, embedding)
                  );""" )
             logging.debug("create embeddings tables: status message: %s",
                           cur.statusmessage)
@@ -77,6 +77,7 @@ def insert_embeddings (conn, text_lines, version, url):
     with conn.cursor() as cur:
         for i, line in enumerate(tqdm(text_lines, desc="Creating embeddings")):
             id = uuid.uuid4()
+            logging.info("insert_embeddings(): %s", line[0:20])
             # Insert the embedding
             # embedding = normalize_vector(model.encode(line))
             # embedding = response['data'][0]['embedding']
@@ -95,8 +96,8 @@ def insert_embeddings (conn, text_lines, version, url):
                 (id, version, url, line, embedding_str)
             )
             # conn.commit()
-            # logging.debug("insert_embeddings(): status message: %s",
-                          # cur.statusmessage)
+            logging.debug("insert_embeddings(): status message: %s",
+                          cur.statusmessage)
     return len(text_lines)
 
 def main():
@@ -108,7 +109,7 @@ def main():
 
     args = parser.parse_args()
 
-    # logging.basicConfig(level=logging.DEBUG if opt.verbose else logging.INFO)
+    logging.basicConfig(level=logging.INFO)
     try:
         # Attempt to connect to cluster with connection string provided to
         # script. By default, this script uses the value saved to the

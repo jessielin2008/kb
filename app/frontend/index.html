@@ -148,7 +148,8 @@
             fetch(`http://localhost:8000/rag?question=${encodeURIComponent(userInput)}`, {
                 method: "GET",
                 headers: {
-                    "Authorization": "Bearer test_<api-key>"
+                    "Authorization": "Bearer test_<api-key>",
+                    "Content-Type": "application/json"
                 }
             })
             .then(response => response.json())

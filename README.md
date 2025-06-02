@@ -12,13 +12,23 @@ export OPENAI_API_KEY=
 ## create virtual environment for data loader and api server. Activiate each environment
 python3 -m venv venv 
 source venv/bin/activate
-python -m pip install requirements.txt
+python -m pip install -r requirements.txt
+
+## crawl documents as markdown
+python -m pip install -U crawl4ai
+crawl4ai-setup
+crawl4ai-doctor 
+
+crwl https://www.cockroachlabs.com/docs/v25.2/vector-indexes.html -o markdown > vector.md
 
 ## create schema and load embeddings
+
+
 ```bash
-python create-embeddings.py --mdfile vector.md --url 'https://www.cockroachlabs.com/docs/v24.3/vector.html'
-python create-embeddings.py --mdfile defaultpriv.md --url 'https://docs.google.com/document/d/1nOf_vjxhOXdsI7Qq596UE7Ih7IvWbFus7NeL_dC5OdY/edit?usp=sharing'
+python create-embeddings.py --mdfile vector.md --url 'https://www.cockroachlabs.com/docs/v25.2/vector.html'
+python create-embeddings.py --mdfile vector-index.md --url 'https://www.cockroachlabs.com/docs/v25.2/vector-indexes.html'
 python create-embeddings.py --mdfile changefeederr.md --url 'https://cockroachlabs.atlassian.net/wiki/spaces/CKB/pages/2839838826/Runbook+Fix+Changefeeds+error+Message+was+too+large'
+python create-embeddings.py --mdfile defaultpriv.md --url 'https://docs.google.com/document/d/1nOf_vjxhOXdsI7Qq596UE7Ih7IvWbFus7NeL_dC5OdY/edit?usp=sharing'
 ```
 ## create api key table & key
 `create-embeddings.py` creates the schema for embeddings and api_keys. Create an active API key.
@@ -42,7 +52,7 @@ python3 -m http.server 8001
 
 # test fastapi 
 ```bash
-curl -H "X-API-Key: <rag_api_key>" \
+curl -H "Authorization: Bearer test_<api-key>" \
      "http://localhost:8000/rag?question=What%20is%20vector%20data%20type"
 ```
 # docker
@@ -52,7 +62,7 @@ cd app/api
 source venv/bin/activate
 python -m pip freeze > requirements.txt
 docker buildx create --use  # Only need to do this once
-docker buildx build --platform linux/amd64,linux/arm64
+# docker buildx build --platform linux/amd64,linux/arm64
 docker build -t waterg2008/rag:v0.1 . 
 docker run  -p 8000:8000  -e DATABASE_URL=$DATABASE_URL_DOCKER -e OPENAI_API_KEY=$OPENAI_API_KEY waterg2008/rag:v0.1
 ```

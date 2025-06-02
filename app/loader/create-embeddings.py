@@ -16,6 +16,7 @@ def create_schema (conn):
     conn.autocommit = True
     with conn.cursor() as cur:
             # openai embeddings has 1536 dimensions, while SentenceTransformer has 384
+            cur.execute ("SET CLUSTER SETTING feature.vector_index.enabled = true;")
             cur.execute(
                 """CREATE TABLE IF NOT EXISTS public.embeddings  (
                      id UUID NOT NULL, 
@@ -76,28 +77,32 @@ def insert_embeddings (conn, text_lines, version, url):
     conn.autocommit = True
     with conn.cursor() as cur:
         for i, line in enumerate(tqdm(text_lines, desc="Creating embeddings")):
-            id = uuid.uuid4()
-            logging.info("insert_embeddings(): %s", line[0:20])
-            # Insert the embedding
-            # embedding = normalize_vector(model.encode(line))
-            # embedding = response['data'][0]['embedding']
- 
-            # Call OpenAI Embeddings API
-            response = client.embeddings.create(
-                input=[line],
-                model="text-embedding-ada-002"  # This is the current recommended embedding model
-            )
-            embedding = response.data[0].embedding
-            
-            # Convert list to PostgreSQL-compatible format
-            embedding_str = f"[{','.join(map(str, embedding))}]"
-            cur.execute(
-                "INSERT INTO embeddings (id, version, url, text, embedding) VALUES (%s, %s, %s, %s, %s)",
-                (id, version, url, line, embedding_str)
-            )
-            # conn.commit()
-            logging.debug("insert_embeddings(): status message: %s",
-                          cur.statusmessage)
+            try:
+                id = uuid.uuid4()
+                logging.info("insert_embeddings(): %s", line[0:20])
+                # Insert the embedding
+                # embedding = normalize_vector(model.encode(line))
+                # embedding = response['data'][0]['embedding']
+    
+                # Call OpenAI Embeddings API
+                response = client.embeddings.create(
+                    input=[line],
+                    model="text-embedding-ada-002"  # This is the current recommended embedding model
+                )
+                embedding = response.data[0].embedding
+                
+                # Convert list to PostgreSQL-compatible format
+                embedding_str = f"[{','.join(map(str, embedding))}]"
+                cur.execute(
+                    "INSERT INTO embeddings (id, version, url, text, embedding) VALUES (%s, %s, %s, %s, %s)",
+                    (id, version, url, line, embedding_str)
+                )
+                # conn.commit()
+                logging.debug("insert_embeddings(): status message: %s",
+                            cur.statusmessage)
+            except Exception as e:
+                logging.error("failed to insert embedding for line %d: %s", i, line[0:20])
+                logging.error(e)   
     return len(text_lines)
 
 def main():
@@ -105,11 +110,11 @@ def main():
     parser.add_argument("--mdfile", required=True, help="Path to the markdown file to process")
     parser.add_argument("--url", required=True, help="URL of the markdown file")
     parser.add_argument("--delimiter", default="# ", help="Delimiter to split the markdown file (default: '# ')")
-    parser.add_argument("--version", default="v24.3", help="Version of cockroachdb (default: v24.3)")
+    parser.add_argument("--version", default="v25.2", help="Version of cockroachdb (default: v25.2)")
 
     args = parser.parse_args()
 
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.WARNING)
     try:
         # Attempt to connect to cluster with connection string provided to
         # script. By default, this script uses the value saved to the

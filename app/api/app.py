@@ -7,14 +7,14 @@ import os
 from openai import OpenAI
 from glob import glob
 from sentence_transformers import SentenceTransformer
-import psycopg
+from psycopg_pool import ConnectionPool
 from psycopg.rows import namedtuple_row
 from fastapi.middleware.cors import CORSMiddleware
 import logging
 
 # Set up basic logging
 logging.basicConfig(
-    level=logging.DEBUG,  # You can change to INFO in production
+    level=logging.INFO,  # You can change to INFO in production
     format="%(asctime)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
@@ -38,10 +38,14 @@ app.add_middleware(
 )
 
 # Database connection
-db_url = os.environ.get("DATABASE_URL")
-conn = psycopg.connect(db_url, 
-                application_name="$play_chatbot_backend", 
-                row_factory=namedtuple_row)
+pool = ConnectionPool(conninfo=os.environ.get("DATABASE_URL"),
+                      kwargs={"application_name": "chatbot",
+                              "keepalives": 1,
+                              "keepalives_idle": 60,
+                              "keepalives_interval": 10,
+                              "keepalives_count": 5},
+                      max_lifetime=600        # 10 minutes
+                      )
 
 def generate_response(question):
     
@@ -65,7 +69,7 @@ def generate_response(question):
     return {"answer": answer}
 
 
-def retrieve_similar_texts(query, crdb_ver, k=3):
+def retrieve_similar_texts(query, crdb_ver, conn, k=3):
     """Retrieve the top-k most similar texts from pgvector."""
     # embedding = model.encode(query).tolist()
     response = client.embeddings.create(
@@ -81,20 +85,26 @@ def retrieve_similar_texts(query, crdb_ver, k=3):
     # print (embedding_str)
     with conn.cursor() as cursor:
         cursor.execute(f"""
-            SELECT url, text, embedding <-> %s AS distance
+            SELECT url, text, embedding <-> %s AS distance, id
             FROM embeddings
             WHERE version = %s
             ORDER BY embedding <-> %s
             LIMIT %s;
         """, (embedding_str, crdb_ver, embedding_str, k))
-    
+        logger.debug(f"""
+            SELECT url, text, embedding <-> %s AS distance, id
+            FROM embeddings
+            WHERE version = %s
+            ORDER BY embedding <-> %s
+            LIMIT %s;
+        """, (embedding_str, crdb_ver, embedding_str, k))
         results = cursor.fetchall()
     return results
 
-def generate_rag_response(question, k=3):
+def generate_rag_response(conn, question, k=3):
 
     """Retrieve relevant documents and generate a response using GPT, showing source IDs."""
-    retrieved_texts = retrieve_similar_texts(question, "v24.3", k)
+    retrieved_texts = retrieve_similar_texts(question, "v25.2", conn, k)
 
     if not retrieved_texts:
         return {"answer": "I couldn't find relevant information in the database.", "sources": []}
@@ -103,7 +113,7 @@ def generate_rag_response(question, k=3):
     # Extract IDs and texts separately
     urls = [str(row[0]) for row in retrieved_texts]
     texts = [row[1] for row in retrieved_texts]
-    similarities = [str(row[2]) for row in retrieved_texts]
+    ids = [str(row[3]) for row in retrieved_texts]
 
     # Combine retrieved texts for the prompt
     context = "\n".join(texts)
@@ -128,26 +138,25 @@ def generate_rag_response(question, k=3):
         ],
     )
     answer = response.choices[0].message.content
-    return {"answer": answer, "urls": urls}
+    return {"answer": answer, "urls": urls, "ids": ids}
 
 def validate_api_key(api_key: str) -> bool:
-    try:
-        cursor = conn.cursor()
-        query = """
-        SELECT * FROM api_keys
-        WHERE key = %s AND is_active = TRUE
-        LIMIT 1;
-        """
-        cursor.execute(query, (api_key,))
-        result = cursor.fetchone()
-        logger.debug(f"query is {query} and key is {api_key}")
-        cursor.close()
+    with pool.connection() as conn:
+        with conn.cursor() as cursor:
+            try:
+                query = """
+                SELECT * FROM api_keys
+                WHERE key = %s AND is_active = TRUE
+                LIMIT 1;
+                """
+                cursor.execute(query, (api_key,))
+                result = cursor.fetchone()
+                logger.debug(f"query is {query} and key is {api_key}")
+                return result is not None  # True if key is valid and active
 
-        return result is not None  # True if key is valid and active
-
-    except Exception as e:
-        print(f"[ERROR] API key validation failed: {e}")
-        return False
+            except Exception as e:
+                print(f"[ERROR] API key validation failed: {e}")
+                return False
  
 def verify_api_key(credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme)):
     if not validate_api_key(credentials.credentials):
@@ -156,5 +165,6 @@ def verify_api_key(credentials: HTTPAuthorizationCredentials = Depends(bearer_sc
 @app.get("/rag")
 def query_rag(question: str, api_check: bool = Depends(verify_api_key)):
     """API endpoint for querying the RAG system."""
-    response = generate_rag_response(question)
+    with pool.connection() as conn:
+        response = generate_rag_response(conn, question)
     return response
